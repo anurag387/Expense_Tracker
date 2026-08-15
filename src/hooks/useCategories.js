@@ -1,22 +1,7 @@
-import { useEffect, useMemo } from 'react';
-import useLocalStorageState from './useLocalStorageState.js';
-import { uid } from '../utils/storage.js';
+import { useEffect, useState } from 'react';
+import { api } from '../utils/api.js';
 
 const PALETTE = ['#16a8ff', '#43f0a7', '#ff6f86', '#ffd84d', '#8d7cff', '#ff9f5a', '#5ad1ff', '#c084fc'];
-
-function buildDefaultCategories() {
-  return [
-    { id: uid('cat'), key: 'food', icon: '🍔', color: '#ff9f5a' },
-    { id: uid('cat'), key: 'groceries', icon: '🛒', color: '#43f0a7' },
-    { id: uid('cat'), key: 'transport', icon: '🚌', color: '#16a8ff' },
-    { id: uid('cat'), key: 'shopping', icon: '🛍️', color: '#8d7cff' },
-    { id: uid('cat'), key: 'bills', icon: '🧾', color: '#ffd84d' },
-    { id: uid('cat'), key: 'health', icon: '💊', color: '#ff6f86' },
-    { id: uid('cat'), key: 'entertainment', icon: '🎬', color: '#5ad1ff' },
-    { id: uid('cat'), key: 'salary', icon: '💼', color: '#43f0a7' },
-    { id: uid('cat'), key: 'other', icon: '📦', color: '#8792a5' },
-  ];
-}
 
 export function categoryName(category, dictionaries, lang) {
   if (!category) return 'Uncategorized';
@@ -27,38 +12,43 @@ export function categoryName(category, dictionaries, lang) {
 }
 
 export default function useCategories(userId) {
-  const storageKey = userId ? `etrack_categories_${userId}` : null;
-  const [categories, setCategories] = useLocalStorageState(storageKey, undefined);
-
-  // Stable across re-renders until it actually gets persisted.
-  const defaults = useMemo(() => buildDefaultCategories(), [userId]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (userId && categories === undefined) {
-      setCategories(defaults);
+    let active = true;
+    if (!userId) {
+      setCategories([]);
+      setLoading(false);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, categories]);
+    setLoading(true);
+    api
+      .get('/categories')
+      .then((list) => active && setCategories(list))
+      .catch(() => active && setCategories([]))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
-  const list = categories === undefined ? defaults : categories;
-
-  function addCategory({ name, icon, color }) {
-    const next = [
-      ...list,
-      { id: uid('cat'), name, icon: icon || '📁', color: color || PALETTE[list.length % PALETTE.length] },
-    ];
-    setCategories(next);
+  async function addCategory({ name, icon, color }) {
+    const record = await api.post('/categories', { name, icon, color });
+    setCategories((list) => [...list, record]);
+    return record;
   }
 
-  function updateCategory(id, patch) {
-    setCategories(
-      list.map((c) => (c.id === id ? { ...c, ...patch, key: patch.name ? undefined : c.key } : c))
-    );
+  async function updateCategory(id, patch) {
+    const record = await api.put(`/categories/${id}`, patch);
+    setCategories((list) => list.map((c) => (c.id === id ? record : c)));
+    return record;
   }
 
-  function deleteCategory(id) {
-    setCategories(list.filter((c) => c.id !== id));
+  async function deleteCategory(id) {
+    await api.del(`/categories/${id}`);
+    setCategories((list) => list.filter((c) => c.id !== id));
   }
 
-  return { categories: list, addCategory, updateCategory, deleteCategory, palette: PALETTE };
+  return { categories, addCategory, updateCategory, deleteCategory, palette: PALETTE, loading };
 }

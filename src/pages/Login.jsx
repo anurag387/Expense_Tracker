@@ -13,17 +13,20 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   if (isAuthenticated) {
     return <Navigate to={location.state?.from || '/'} replace />;
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    const result = login({ email, password });
+    setSubmitting(true);
+    const result = await login({ email, password });
+    setSubmitting(false);
     if (!result.success) {
-      setError(t('invalidCredentials'));
+      setError(result.message || t('invalidCredentials'));
       return;
     }
     navigate('/', { replace: true });
@@ -83,8 +86,8 @@ export default function Login() {
             </Link>
           </div>
 
-          <button type="submit" className="btn btn-primary btn-block">
-            {t('login')}
+          <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+            {submitting ? '...' : t('login')}
           </button>
         </form>
 

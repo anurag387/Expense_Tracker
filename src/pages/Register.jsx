@@ -15,6 +15,7 @@ export default function Register() {
   const [photo, setPhoto] = useState(null);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
@@ -51,17 +52,19 @@ export default function Register() {
     return Object.keys(next).length === 0;
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setServerError('');
     if (!validate()) return;
 
-    const result = register({
+    setSubmitting(true);
+    const result = await register({
       name: form.name,
       email: form.email,
       password: form.password,
       photo,
     });
+    setSubmitting(false);
 
     if (!result.success) {
       setServerError(result.message);
@@ -129,8 +132,8 @@ export default function Register() {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary btn-block">
-            {t('createAccount')}
+          <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+            {submitting ? '...' : t('createAccount')}
           </button>
         </form>
 

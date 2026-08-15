@@ -1,111 +1,107 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { readJSON, writeJSON, uid } from '../utils/storage.js';
-
-const USERS_KEY = 'etrack_users';
-const SESSION_KEY = 'etrack_session';
+import { api, getToken, setToken, setUnauthorizedHandler } from '../utils/api.js';
 
 const AuthContext = createContext(null);
-
-function getUsers() {
-  return readJSON(USERS_KEY, []);
-}
-function saveUsers(users) {
-  writeJSON(USERS_KEY, users);
-}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
 
+  // On load, if we have a saved token, ask the backend who we are. This
+  // replaces the old "read session id from localStorage" check.
   useEffect(() => {
-    const sessionId = readJSON(SESSION_KEY, null);
-    if (sessionId) {
-      const found = getUsers().find((u) => u.id === sessionId);
-      if (found) setUser(stripPassword(found));
+    let active = true;
+
+    async function bootstrap() {
+      const token = getToken();
+      if (!token) {
+        setReady(true);
+        return;
+      }
+      try {
+        const { user: me } = await api.get('/auth/me');
+        if (active) setUser(me);
+      } catch {
+        setToken(null);
+      } finally {
+        if (active) setReady(true);
+      }
     }
-    setReady(true);
+
+    bootstrap();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  function stripPassword(u) {
-    if (!u) return u;
-    const { password, ...rest } = u;
-    return rest;
+  useEffect(() => {
+    // If any API call comes back 401 (expired/invalid token), log out
+    // cleanly instead of leaving the UI in a broken half-authed state.
+    setUnauthorizedHandler(() => {
+      setToken(null);
+      setUser(null);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  async function register({ name, email, password, photo }) {
+    try {
+      const { token, user: newUser } = await api.postPublic('/auth/register', {
+        name,
+        email,
+        password,
+        photo,
+      });
+      setToken(token);
+      setUser(newUser);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
   }
 
-  function register({ name, email, password, photo }) {
-    const users = getUsers();
-    const emailNormalized = email.trim().toLowerCase();
-
-    if (users.some((u) => u.email.toLowerCase() === emailNormalized)) {
-      return { success: false, message: 'An account with this email already exists.' };
+  async function login({ email, password }) {
+    try {
+      const { token, user: found } = await api.postPublic('/auth/login', { email, password });
+      setToken(token);
+      setUser(found);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message };
     }
-
-    const newUser = {
-      id: uid('user'),
-      name: name.trim(),
-      email: emailNormalized,
-      password, // Note: for a real app, never store plain-text passwords client-side.
-      photo: photo || null,
-      createdAt: new Date().toISOString(),
-    };
-
-    saveUsers([...users, newUser]);
-    writeJSON(SESSION_KEY, newUser.id);
-    setUser(stripPassword(newUser));
-    return { success: true };
-  }
-
-  function login({ email, password }) {
-    const users = getUsers();
-    const emailNormalized = email.trim().toLowerCase();
-    const found = users.find((u) => u.email.toLowerCase() === emailNormalized);
-
-    if (!found || found.password !== password) {
-      return { success: false, message: 'Invalid email or password' };
-    }
-
-    writeJSON(SESSION_KEY, found.id);
-    setUser(stripPassword(found));
-    return { success: true };
   }
 
   function logout() {
-    writeJSON(SESSION_KEY, null);
+    setToken(null);
     setUser(null);
   }
 
-  function updateProfile(partial) {
-    const users = getUsers();
-    const idx = users.findIndex((u) => u.id === user.id);
-    if (idx === -1) return { success: false, message: 'User not found' };
-
-    const updated = { ...users[idx], ...partial };
-    const nextUsers = [...users];
-    nextUsers[idx] = updated;
-    saveUsers(nextUsers);
-    setUser(stripPassword(updated));
-    return { success: true };
-  }
-
-  function changePassword({ currentPassword, newPassword }) {
-    const users = getUsers();
-    const idx = users.findIndex((u) => u.id === user.id);
-    if (idx === -1 || users[idx].password !== currentPassword) {
-      return { success: false, message: 'Current password is incorrect' };
+  async function updateProfile(partial) {
+    try {
+      const { user: updated } = await api.put('/auth/profile', partial);
+      setUser(updated);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message };
     }
-    const nextUsers = [...users];
-    nextUsers[idx] = { ...nextUsers[idx], password: newPassword };
-    saveUsers(nextUsers);
-    return { success: true };
   }
 
-  function requestPasswordReset(email) {
-    const users = getUsers();
-    const found = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-    // Frontend-only demo: we can't actually send an email, so we just report
-    // whether the account exists. A real backend would email a reset link.
-    if (!found) return { success: false, message: 'No account found with that email.' };
-    return { success: true, message: 'A password reset link has been sent (demo mode).' };
+  async function changePassword({ currentPassword, newPassword }) {
+    try {
+      await api.put('/auth/password', { currentPassword, newPassword });
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
+
+  async function requestPasswordReset(email) {
+    try {
+      const data = await api.postPublic('/auth/forgot-password', { email });
+      return { success: true, message: data.message };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
   }
 
   const value = {

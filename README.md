@@ -1,47 +1,105 @@
-# Expense Tracker — React (Frontend-only) Version
+# Expense Tracker — Full-Stack (React + Express)
 
-A personal finance dashboard built with **React 18 + Vite**, styled to match the
-dark-finance dashboard design spec (with a Light mode toggle), supporting
-**English + বাংলা**.
+A personal finance dashboard built with **React 18 + Vite** on the frontend
+and a **Node/Express API** on the backend, styled to match a dark-finance
+dashboard design spec (with a Light mode toggle), supporting **English +
+বাংলা**.
 
-This is the **React version**: there is no separate Node/Express/MongoDB
-backend. All data (accounts, transactions, categories, reminders, and the
-user's own registered accounts) is stored in the browser's `localStorage`,
-namespaced per user. That means:
+This is the **full-stack version**: real user accounts (hashed passwords,
+JWT-based login sessions) live on a small Express API, and all data
+(accounts, transactions, categories, reminders) is stored server-side and
+scoped to the logged-in user — so it now syncs across browsers/devices,
+instead of being stuck in one browser's `localStorage`.
 
-- It runs immediately with just `npm install` — no database or server setup.
-- Data persists across refreshes/restarts on the same browser.
-- Data does **not** sync across devices/browsers (there's no real backend).
-- Passwords are stored locally in plain text for demo purposes only — **do
-  not reuse a real password when testing this app**.
+The backend uses a lightweight JSON-file "database" (`server/data/db.json`,
+created automatically on first run) rather than MongoDB/Postgres — there's
+nothing extra to install or configure, `npm install` is all it takes. If you
+want to swap in a real database later, `server/src/db.js` is the only file
+that would need to change; every route just calls `readDB()` / `writeDB()`.
 
-If you later want the full-stack version (Node + Express + MongoDB, real
-password hashing, JWT auth, image storage, etc.) the data layer in
-`src/hooks/` and `src/context/AuthContext.jsx` is the part you'd swap out for
-real API calls — the rest of the app (components, pages, charts) would not
-need to change much, since they only talk to the hooks, not to
-localStorage directly.
+## Project structure
+
+```
+expense-tracker/
+  src/            React frontend (Vite)
+  server/         Express backend (JWT auth + JSON-file storage)
+  package.json    Frontend package.json (+ scripts to run both together)
+```
 
 ## Getting started
 
+You need two things running: the **backend API** and the **frontend**.
+Easiest is one command from the project root — it starts both together:
+
 ```bash
+# from the expense-tracker/ root, first time only:
+npm run install:all
+
+# copy the example env files (defaults already match each other)
+cp .env.example .env
+cp server/.env.example server/.env
+
+# then, every time you want to run the app:
+npm run dev:all
+```
+
+This prints two color-coded logs (FRONTEND / BACKEND) in one terminal.
+Open the printed frontend URL — usually `http://localhost:5173`.
+
+<details>
+<summary>Prefer two separate terminals?</summary>
+
+```bash
+# Terminal 1 — backend
+cd server
 npm install
+cp .env.example .env
+npm run dev
+
+# Terminal 2 — frontend
+npm install
+cp .env.example .env
 npm run dev
 ```
 
-Then open the printed local URL (usually `http://localhost:5173`).
+</details>
 
-To build for production:
+To build the frontend for production:
 
 ```bash
 npm run build
 npm run preview
 ```
 
+The backend doesn't need a build step — `npm start` inside `server/` runs it
+as-is (use this instead of `npm run dev` in production, since `dev` uses
+`--watch` for auto-restart on file changes).
+
+## Environment variables
+
+**Frontend** (`.env`, see `.env.example`):
+| Variable | Purpose | Default |
+|---|---|---|
+| `VITE_API_URL` | Base URL the frontend calls for the API | `http://localhost:4000/api` |
+
+**Backend** (`server/.env`, see `server/.env.example`):
+| Variable | Purpose | Default |
+|---|---|---|
+| `PORT` | Port the API listens on | `4000` |
+| `JWT_SECRET` | Secret used to sign login tokens — **change this** before deploying anywhere real | (placeholder) |
+| `JWT_EXPIRES_IN` | How long a login session stays valid | `7d` |
+| `CLIENT_ORIGIN` | Frontend URL, used for CORS | `http://localhost:5173` |
+
+Neither `.env` file is committed to git (see `.gitignore`) — that's why
+there's a `.env.example` to copy from instead.
+
 ## Features implemented
 
 - **Auth**: Register (with profile photo upload), Login, Forgot Password
-  (demo mode — no real email is sent), protected routes, Log out
+  (demo mode — no real email is sent), protected routes, Log out. Passwords
+  are hashed with bcrypt server-side and never stored or sent in plain text
+  after registration; sessions are JWTs stored in the browser and sent as
+  `Authorization: Bearer <token>` on every API request.
 - **Dashboard**: Balance / Expense / Income summary cards with month-over-
   month % change, category breakdown (progress bars + donut chart), recent
   transactions, upcoming reminders, account/month/year filters
@@ -61,37 +119,74 @@ npm run preview
   list add/delete transitions, animated chart mount, theme cross-fade, etc.)
 - **Responsive**: sidebar on desktop, bottom tab bar on mobile
 
-## Project structure
+## Project structure (frontend)
 
 ```
 src/
   components/       Reusable UI: Sidebar, modals, charts, cards, rows
-  context/          AuthContext, ThemeContext, LanguageContext
-  hooks/            localStorage-backed data hooks (categories, accounts,
-                     transactions, reminders) + generic useLocalStorageState
+  context/          AuthContext (talks to the API), ThemeContext, LanguageContext
+  hooks/            API-backed data hooks (categories, accounts,
+                     transactions, reminders)
   i18n/              en.js / bn.js dictionaries
   pages/             One file per route (Dashboard, Transactions, ...)
-  utils/             storage.js, format.js, calculations.js
+  utils/             api.js (fetch wrapper), format.js, calculations.js,
+                     storage.js (still used for theme/language prefs only)
   App.jsx            Route definitions
   main.jsx           App bootstrap (providers + router)
   index.css          Global theme variables + all component styles
 ```
 
+## Project structure (backend)
+
+```
+server/
+  src/
+    index.js           Express app entry point
+    db.js               JSON-file "database" (read/write/uid helpers)
+    middleware/auth.js   JWT sign + verify middleware
+    routes/
+      auth.js            register, login, me, profile, password, forgot-password
+      transactions.js     CRUD, scoped to the logged-in user
+      categories.js       CRUD, scoped to the logged-in user
+      accounts.js         CRUD, scoped to the logged-in user
+      reminders.js        CRUD + toggle, scoped to the logged-in user
+    utils/
+      asyncHandler.js     wraps async routes so errors reach Express
+      defaults.js         seeds default categories/accounts for new users
+  data/
+    db.json              auto-created on first run — not committed to git
+```
+
+## API overview
+
+All routes below (except `/auth/register`, `/auth/login`,
+`/auth/forgot-password`) require `Authorization: Bearer <token>`.
+
+| Method & Path | Purpose |
+|---|---|
+| `POST /api/auth/register` | Create an account, returns `{ token, user }` |
+| `POST /api/auth/login` | Log in, returns `{ token, user }` |
+| `GET /api/auth/me` | Get the current user |
+| `PUT /api/auth/profile` | Update name/email/photo |
+| `PUT /api/auth/password` | Change password |
+| `POST /api/auth/forgot-password` | Demo password-reset check |
+| `GET/POST /api/transactions`, `PUT/DELETE /api/transactions/:id` | Transaction CRUD |
+| `GET/POST /api/categories`, `PUT/DELETE /api/categories/:id` | Category CRUD |
+| `GET/POST /api/accounts`, `PUT/DELETE /api/accounts/:id` | Account CRUD |
+| `GET/POST /api/reminders`, `PUT/DELETE /api/reminders/:id`, `POST /api/reminders/:id/toggle` | Reminder CRUD |
+
 ## Notes on scope
 
-Everything in the design spec's "Required Final Financial Features"
-checklist is implemented (balance/income/expense totals + counts, full
-transaction CRUD, category stats, all three chart types, search/filters,
-account/month/year filtering), plus reminders, profile photo, and the
-bn/en + dark/light systems.
-
-Left out on purpose, since they need a real backend to make sense:
-- Real email delivery for password reset
-- Server-side auth (JWT, hashed passwords), rate limiting
-- Multi-device data sync
-- Automated tests (kept out to keep the delivered zip focused — the design
-  doc's Section 71 notes this as optional "for portfolio credibility" and is
-  a good next addition if you want to extend this yourself)
+Left out on purpose, since they're beyond what a personal-project backend
+typically needs:
+- Real email delivery for password reset (still demo mode — reports whether
+  the account exists, doesn't send anything)
+- Refresh tokens / token revocation (JWTs just expire after `JWT_EXPIRES_IN`)
+- Rate limiting
+- A "real" database (Postgres/MongoDB) — the JSON-file store is fine for a
+  personal project or portfolio piece, and swapping it in later only touches
+  `server/src/db.js`
+- Automated tests
 
 ## Default login data
 

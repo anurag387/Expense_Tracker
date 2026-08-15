@@ -1,27 +1,50 @@
-import useLocalStorageState from './useLocalStorageState.js';
-import { uid } from '../utils/storage.js';
+import { useEffect, useState } from 'react';
+import { api } from '../utils/api.js';
 
 export default function useReminders(userId) {
-  const storageKey = userId ? `etrack_reminders_${userId}` : null;
-  const [reminders, setReminders] = useLocalStorageState(storageKey, []);
-  const list = reminders || [];
+  const [reminders, setReminders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  function addReminder(data) {
-    const record = { id: uid('rem'), done: false, createdAt: new Date().toISOString(), ...data };
-    setReminders([record, ...list]);
+  useEffect(() => {
+    let active = true;
+    if (!userId) {
+      setReminders([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    api
+      .get('/reminders')
+      .then((list) => active && setReminders(list))
+      .catch(() => active && setReminders([]))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  async function addReminder(data) {
+    const record = await api.post('/reminders', data);
+    setReminders((list) => [record, ...list]);
+    return record;
   }
 
-  function updateReminder(id, patch) {
-    setReminders(list.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  async function updateReminder(id, patch) {
+    const record = await api.put(`/reminders/${id}`, patch);
+    setReminders((list) => list.map((r) => (r.id === id ? record : r)));
+    return record;
   }
 
-  function toggleReminder(id) {
-    setReminders(list.map((r) => (r.id === id ? { ...r, done: !r.done } : r)));
+  async function toggleReminder(id) {
+    const record = await api.post(`/reminders/${id}/toggle`);
+    setReminders((list) => list.map((r) => (r.id === id ? record : r)));
+    return record;
   }
 
-  function deleteReminder(id) {
-    setReminders(list.filter((r) => r.id !== id));
+  async function deleteReminder(id) {
+    await api.del(`/reminders/${id}`);
+    setReminders((list) => list.filter((r) => r.id !== id));
   }
 
-  return { reminders: list, addReminder, updateReminder, toggleReminder, deleteReminder };
+  return { reminders, addReminder, updateReminder, toggleReminder, deleteReminder, loading };
 }

@@ -15,7 +15,7 @@ export default function Settings() {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setMessage(null);
 
@@ -28,7 +28,7 @@ export default function Settings() {
       return;
     }
 
-    const result = changePassword({
+    const result = await changePassword({
       currentPassword: form.currentPassword,
       newPassword: form.newPassword,
     });

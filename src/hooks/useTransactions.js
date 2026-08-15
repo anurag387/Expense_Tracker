@@ -1,24 +1,44 @@
-import useLocalStorageState from './useLocalStorageState.js';
-import { uid } from '../utils/storage.js';
+import { useEffect, useState } from 'react';
+import { api } from '../utils/api.js';
 
 export default function useTransactions(userId) {
-  const storageKey = userId ? `etrack_transactions_${userId}` : null;
-  const [transactions, setTransactions] = useLocalStorageState(storageKey, []);
-  const list = transactions || [];
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  function addTransaction(data) {
-    const record = { id: uid('txn'), createdAt: new Date().toISOString(), ...data };
-    setTransactions([record, ...list]);
+  useEffect(() => {
+    let active = true;
+    if (!userId) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    api
+      .get('/transactions')
+      .then((list) => active && setTransactions(list))
+      .catch(() => active && setTransactions([]))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  async function addTransaction(data) {
+    const record = await api.post('/transactions', data);
+    setTransactions((list) => [record, ...list]);
     return record;
   }
 
-  function updateTransaction(id, patch) {
-    setTransactions(list.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  async function updateTransaction(id, patch) {
+    const record = await api.put(`/transactions/${id}`, patch);
+    setTransactions((list) => list.map((t) => (t.id === id ? record : t)));
+    return record;
   }
 
-  function deleteTransaction(id) {
-    setTransactions(list.filter((t) => t.id !== id));
+  async function deleteTransaction(id) {
+    await api.del(`/transactions/${id}`);
+    setTransactions((list) => list.filter((t) => t.id !== id));
   }
 
-  return { transactions: list, addTransaction, updateTransaction, deleteTransaction };
+  return { transactions, addTransaction, updateTransaction, deleteTransaction, loading };
 }

@@ -37,7 +37,7 @@ export default function Profile() {
     reader.readAsDataURL(file);
   }
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.preventDefault();
     if (!name.trim()) {
       setError(t('requiredField'));
@@ -47,7 +47,11 @@ export default function Profile() {
       setError(t('invalidEmail'));
       return;
     }
-    updateProfile({ name: name.trim(), email: email.trim().toLowerCase(), photo });
+    const result = await updateProfile({ name: name.trim(), email: email.trim().toLowerCase(), photo });
+    if (!result.success) {
+      setError(result.message);
+      return;
+    }
     setEditing(false);
     setSaved(true);
   }

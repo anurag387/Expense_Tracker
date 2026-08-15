@@ -10,9 +10,9 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState(null);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    const result = requestPasswordReset(email);
+    const result = await requestPasswordReset(email);
     setMessage(result);
   }
 
