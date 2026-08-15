@@ -1,4 +1,6 @@
 # Expense Tracker — Full-Stack (React + Express)
+## 🔗 Live Demo
+[expense-tracker-beta-liard.vercel.app](https://expense-tracker-beta-liard.vercel.app)
 
 A personal finance dashboard built with **React 18 + Vite** on the frontend
 and a **Node/Express API** on the backend, styled to match a dark-finance
