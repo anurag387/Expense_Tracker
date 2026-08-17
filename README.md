@@ -10,6 +10,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-Express-339933?style=flat-square&logo=node.js&logoColor=white)](https://expressjs.com/)
 [![JWT](https://img.shields.io/badge/Auth-JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)](https://jwt.io/)
 [![Languages](https://img.shields.io/badge/i18n-English%20%7C%20বাংলা-orange?style=flat-square)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](./LICENSE)
 
 A dark-finance dashboard — track income, expenses, and budgets with charts, categories, reminders, and bilingual (English + বাংলা) support.
 
@@ -40,6 +41,7 @@ This is the **full-stack version**: real user accounts (hashed passwords, JWT-ba
 - [API Overview](#-api-overview)
 - [Notes on Scope](#-notes-on-scope)
 - [Default Login Data](#-default-login-data)
+- [License](#-license)
 
 ---
 
@@ -260,6 +262,14 @@ Left out on purpose, since they're beyond what a personal-project backend typica
 ## 👤 Default Login Data
 
 There's no seeded demo account — register a new one from the **Create Account** page to get started. Each registered user gets their own set of default categories (Food, Groceries, Transport, Shopping, Bills, Health, Entertainment, Salary, Other) and accounts (Cash, Bank), which you can edit or delete afterward.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](./LICENSE) file for details.
+
+You're free to use, modify, and distribute this project, even commercially, as long as the original copyright notice is included.
 
 ---
 
